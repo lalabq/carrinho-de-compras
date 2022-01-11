@@ -65,9 +65,9 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
 
   const removeProduct = (productId: number) => {
     try {
-      // TODO
+      setCart(cart.filter(product => product.id !== productId));
     } catch {
-      // TODO
+      toast.error('Erro na remoção do produto');
     }
   };
 
@@ -76,9 +76,34 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     amount,
   }: UpdateProductAmount) => {
     try {
-      // TODO
+
+      if (amount <= 0) {
+        return;
+      }
+
+      const stock = await api.get('stock/' + productId)
+        .then(response => response.data.amount);
+
+      var itemInCart = cart.find(item => item.id === productId);
+
+      if (!itemInCart) {
+        return;
+      }
+
+      console.log(stock);
+      console.log(itemInCart.amount);
+
+      if (amount > stock) {
+        toast.error('Quantidade solicitada fora de estoque');
+        return;
+      }
+
+      setCart(
+        cart.map((product : Product) => product.id === productId ? { ...product, amount: amount } : product)
+      )
+
     } catch {
-      // TODO
+      toast.error('Erro na alteração de quantidade do produto');
     }
   };
 
