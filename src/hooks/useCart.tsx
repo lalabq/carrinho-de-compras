@@ -1,7 +1,7 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useContext, useState } from 'react';
 import { toast } from 'react-toastify';
 import { api } from '../services/api';
-import { Product, Stock } from '../types';
+import { Product } from '../types';
 
 interface CartProviderProps {
   children: ReactNode;
@@ -33,39 +33,52 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
   const addProduct = async (productId: number) => {
     try {
 
-      const stock = await api.get('stock/' + productId)
-        .then(response => response.data.amount);
+      const updatedCart = [...cart];
+      const productExists = updatedCart.find(product => product.id === productId);
 
-      var itemInCart = cart.find(item => item.id === productId);
-      var quantityInCart = !!itemInCart ? itemInCart.amount : 0;
+      const stock = await api.get(`/stock/${productId}`);
 
-      if (quantityInCart >= stock) {
-        toast.error('Quantidade solicitada fora de estoque');
+      const stockAmount = stock.data.amount;
+      const currentAmount = productExists ? productExists.amount : 0;
+      const amount = currentAmount + 1;
+
+      if (amount > stockAmount) {
+        toast.error("Quantidade solicitada fora de estoque");
         return;
       }
-
-      if (!!itemInCart) {
-        setCart(
-          cart.map((product : Product) => product.id === productId ? { ...product, amount: product.amount + 1 } : product)
-        )
+      
+      if (productExists) {
+        productExists.amount = amount;
       } else {
-        const newProduct = await api.get('products/' + productId)
-          .then(response => response.data);
-        newProduct.amount = 1;
-        setCart([...cart, newProduct]);
+        const product = await api.get(`/products/${productId}`);
+        const newProduct = {
+          ...product.data,
+          amount: 1
+        }
+        updatedCart.push(newProduct);
       }
+
+      setCart(updatedCart);
+      localStorage.setItem("@RocketShoes:cart", JSON.stringify(updatedCart));
+      
     } catch {
       toast.error('Erro na adição do produto');
     }
   };
 
-  useEffect(() => {
-    localStorage.setItem('@RocketShoes:cart', JSON.stringify(cart));
-  }, [cart]);
-
   const removeProduct = (productId: number) => {
     try {
-      setCart(cart.filter(product => product.id !== productId));
+      const updatedCart = [...cart];
+
+      const productIndex = updatedCart.findIndex(product => product.id === productId);
+      if (productIndex >= 0) {
+        updatedCart.splice(productIndex, 1);
+        setCart(updatedCart);
+        localStorage.setItem("@RocketShoes:cart", JSON.stringify(updatedCart));
+      } else {
+        throw Error();
+      }
+      
     } catch {
       toast.error('Erro na remoção do produto');
     }
@@ -76,31 +89,30 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     amount,
   }: UpdateProductAmount) => {
     try {
-
-      if (amount <= 0) {
+      
+      if (amount < 1) {
         return;
       }
 
       const stock = await api.get('stock/' + productId)
         .then(response => response.data.amount);
 
-      var itemInCart = cart.find(item => item.id === productId);
-
-      if (!itemInCart) {
-        return;
-      }
-
-      console.log(stock);
-      console.log(itemInCart.amount);
-
       if (amount > stock) {
         toast.error('Quantidade solicitada fora de estoque');
         return;
       }
 
-      setCart(
-        cart.map((product : Product) => product.id === productId ? { ...product, amount: amount } : product)
-      )
+      const updatedCart = [...cart];
+
+      var itemInCart = updatedCart.find(product => product.id === productId);
+
+      if (!itemInCart) {
+        throw Error();
+      }
+
+      itemInCart.amount = amount;
+      setCart(updatedCart);
+      localStorage.setItem("@RocketShoes:cart", JSON.stringify(updatedCart));
 
     } catch {
       toast.error('Erro na alteração de quantidade do produto');
